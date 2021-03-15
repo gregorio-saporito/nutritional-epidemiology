@@ -10,7 +10,6 @@ features <- c('NUT12','NUT2','NUT3','NUT5','NUT6','NUT22','NUT23','NUT37','NUT27
               'NUT19','NUT21','NUT33','NUT34','NUT35','NUT28','NUT29','NUT46','NUT36',
               'NUT30','NUT62')
 
-
 # set training data
 minmax <- function(x) (x - min(x))/(max(x) - min(x))
 # standardise the data
@@ -31,7 +30,7 @@ x_train <- as.matrix(x_train)
 ### some parameters
 epochs = 50
 verbose = 1
-# how many dimensions to check
+# how many dimensions to check later
 setdim=5
 
 # set model
@@ -66,6 +65,9 @@ mse.ae2
 # extract the bottleneck layer
 intermediate_layer_model <- keras_model(inputs = model$input, outputs = get_layer(model, "bottleneck")$output)
 intermediate_output <- predict(intermediate_layer_model, x_train)
+
+# print dietary patterns to csv
+write_csv(data.frame(intermediate_output),'outputs/autoencoder.csv')
 
 ggplot(data.frame(PC1 = intermediate_output[,1], PC2 = intermediate_output[,2]), aes(x = PC1, y = PC2, col = factor(data$V2))) + geom_point()
 
