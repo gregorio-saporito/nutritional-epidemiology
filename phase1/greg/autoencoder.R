@@ -66,10 +66,73 @@ mse.ae2
 intermediate_layer_model <- keras_model(inputs = model$input, outputs = get_layer(model, "bottleneck")$output)
 intermediate_output <- predict(intermediate_layer_model, x_train)
 
-# print dietary patterns to csv
+# print dietary patterns extracted with autoencoder to csv
 write_csv(data.frame(intermediate_output),'outputs/autoencoder.csv')
 
 ggplot(data.frame(PC1 = intermediate_output[,1], PC2 = intermediate_output[,2]), aes(x = PC1, y = PC2, col = factor(data$V2))) + geom_point()
+
+# interpret the dimensions
+new_labels = c('energy intake','animal protein', 'vegetable protein', 'animal fat', 'vegetable fat',
+               'cholesterol', 'saturated fatty acids', 'monosaturated fatty acids', 'polyunsaturated fatty acids',
+               'soluble carbohydrates', 'starch', 'alcohol', 'sodium', 'calcium', 'potassium', 'phosphorus',
+               'iron', 'zinc', 'vitamin B1', 'vitamin B2', 'vitamin C', 'vitamin B6', 'total folate',
+               'niacin', 'retinol', 'beta-carotene equivalents', 'lycopene', 'vitamin D', 'vitamin E', 'total fiber')
+
+corcheck = data.frame(matrix(nrow = 30, ncol = 4))
+colnames(corcheck) = c('DIM1','DIM2','DIM3','DIM4')
+rownames(corcheck) = new_labels
+
+for(i in 1:30){
+  for(d in 1:4){
+    corcheck[i,d] = cor(x_train[,i],intermediate_output[,d])
+  }
+}
+
+# exploring the potential presence of nonlinearities
+plot(x_train[,30],intermediate_output[,1])
+plot(x_train[,20],intermediate_output[,3])
+plot(x_train[,15],intermediate_output[,4])
+plot(x_train[,10],intermediate_output[,1])
+plot(x_train[,5],intermediate_output[,2])
+plot(x_train[,1],intermediate_output[,3])
+
+corcheck %>%
+  gather(key='Var1',value=value) %>%
+  mutate(Var2 = rep(rownames(corcheck),4)) %>%
+  mutate(Var2 = factor(Var2, levels=rev(new_labels))) %>% 
+  ggplot(aes(x=Var1, y=Var2, fill=value, label=round(value,2))) +
+  geom_tile() +
+  geom_text(size=2) +
+  scale_fill_gradient2(limits = c(-1,1)) +
+  theme(
+    axis.title.x=element_blank(),
+    axis.title.y=element_blank()
+  ) +
+  ggtitle('Correlations with the latent variables')
+
+# canonical correlation analysis to see which factors are the most similar to the paper
+# first dataset
+compare <- read.csv("phase1/greg/pcfa_loadings.csv")
+rownames(compare) <- compare$nutrient
+compare = compare[,-1]
+X <- as.matrix(compare)
+# second dataset
+Y <- as.matrix(corcheck)
+# canonical correlation
+library(CCA)
+res.cc <- cc(X,Y)
+plt.cc(res.cc, var.label = TRUE)
+
+# guess
+# dim1: vegetable fat
+# dim2: unsaturated fats starch rich
+# dim3: animal proteins
+# dim4: vitamins and fiber
+
+# cor between PC1 and PC2
+cor(pca$x[,1:4])
+# cor between dimension 1 and 2, higher correlations than PCA!
+cor(intermediate_output)
 
 # pCA reconstruction
 pca.recon <- function(pca, x, k){
