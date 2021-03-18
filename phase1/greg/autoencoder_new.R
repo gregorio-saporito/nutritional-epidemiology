@@ -1,16 +1,39 @@
-library(keras)
+# load libraries ----------------------------------------------------------
 library(tidyverse)
 library(readr)
 library(factoextra)
+set.seed(123)
+library(keras)
+library(tensorflow)
 
+# set seeds ---------------------------------------------------------------
+use_session_with_seed(123)
+
+# TensorFlow session configuration that uses only a single thread. Multiple threads are a 
+# potential source of non-reproducible results, see: https://stackoverflow.com/questions/42022950/which-seeds-have-to-be-set-where-to-realize-100-reproducibility-of-training-res
+session_conf <- tf$ConfigProto(intra_op_parallelism_threads = 1L, 
+                               inter_op_parallelism_threads = 1L)
+
+# Set TF random seed
+tf$set_random_seed(123)
+
+# Create the session using the custom configuration
+sess <- tf$Session(graph = tf$get_default_graph(), config = session_conf)
+
+# Instruct Keras to use this session
+K <- backend()
+K$set_session(sess)
+
+# load the data -----------------------------------------------------------
 data <- read_csv("data/breast_cancer_dataset_dse.csv")
 
+# select features
 features <- c('NUT2','NUT3','NUT22','NUT23','NUT37','NUT27','NUT9',
               'NUT11','NUT13','NUT16','NUT15','NUT17','NUT31','NUT14','NUT32','NUT18',
               'NUT19','NUT21','NUT33','NUT34','NUT35','NUT28','NUT29','NUT46','NUT36',
               'NUT30','NUT62')
 
-# set training data
+# scaler
 minmax <- function(x) (x - min(x))/(max(x) - min(x))
 # standardise the data
 x_train <- apply(select(data,features), 2, minmax)
@@ -19,9 +42,7 @@ x_train <- apply(select(data,features), 2, minmax)
 pca <- prcomp(x_train)
 
 summary(pca)
-
 screeplot(pca)
-
 ggplot(as.data.frame(pca$x), aes(x = PC1, y = PC2, col = factor(data$V2))) + geom_point()
 
 # autoencoder
@@ -30,16 +51,14 @@ x_train <- as.matrix(x_train)
 ### some parameters
 epochs = 50
 verbose = 1
-# how many dimensions to check later
-setdim=5
 
 # set model
 model <- keras_model_sequential()
 model %>%
-  layer_dense(units = 20, activation = "tanh", input_shape = ncol(x_train)) %>%
-  layer_dense(units = 4, activation = "tanh", name = "bottleneck") %>%
-  layer_dense(units = 20, activation = "tanh") %>%
-  layer_dense(units = ncol(x_train))
+  layer_dense(units = 20, activation = "tanh", input_shape = ncol(x_train),kernel_initializer=initializer_random_uniform(minval = -0.05, maxval = 0.05, seed = 123)) %>%
+  layer_dense(units = 4, activation = "tanh", name = "bottleneck",kernel_initializer=initializer_random_uniform(minval = -0.05, maxval = 0.05, seed = 123)) %>%
+  layer_dense(units = 20, activation = "tanh",kernel_initializer=initializer_random_uniform(minval = -0.05, maxval = 0.05, seed = 123)) %>%
+  layer_dense(units = ncol(x_train),kernel_initializer=initializer_random_uniform(minval = -0.05, maxval = 0.05, seed = 123))
 
 # view model layers
 summary(model)
@@ -66,13 +85,14 @@ mse.ae2
 intermediate_layer_model <- keras_model(inputs = model$input, outputs = get_layer(model, "bottleneck")$output)
 intermediate_output <- predict(intermediate_layer_model, x_train)
 
-# print dietary patterns extracted with autoencoder to csv
+# save dietary patterns extracted with autoencoder to csv
 write_csv(data.frame(intermediate_output),'outputs/autoencoder_new.csv')
 
 ggplot(data.frame(PC1 = intermediate_output[,1], PC2 = intermediate_output[,2]), aes(x = PC1, y = PC2, col = factor(data$V2))) + geom_point()
 ggplot(data.frame(PC1 = intermediate_output[,1], PC2 = intermediate_output[,3]), aes(x = PC1, y = PC2, col = factor(data$V2))) + geom_point()
 ggplot(data.frame(PC1 = intermediate_output[,1], PC2 = intermediate_output[,4]), aes(x = PC1, y = PC2, col = factor(data$V2))) + geom_point()
 ggplot(data.frame(PC1 = intermediate_output[,2], PC2 = intermediate_output[,3]), aes(x = PC1, y = PC2, col = factor(data$V2))) + geom_point()
+
 ggplot(data.frame(PC1 = intermediate_output[,2], PC2 = intermediate_output[,4]), aes(x = PC1, y = PC2, col = factor(data$V2))) + geom_point()
 ggplot(data.frame(PC1 = intermediate_output[,3], PC2 = intermediate_output[,4]), aes(x = PC1, y = PC2, col = factor(data$V2))) + geom_point()
 
@@ -93,7 +113,7 @@ for(i in 1:27){
 }
 
 # exploring the potential presence of nonlinearities
-plot(x_train[,30],intermediate_output[,1])
+plot(x_train[,27],intermediate_output[,1])
 plot(x_train[,20],intermediate_output[,3])
 plot(x_train[,15],intermediate_output[,4])
 plot(x_train[,10],intermediate_output[,1])
@@ -119,6 +139,10 @@ cor(pca$x[,1:4])
 # cor between dimension 1 and 2, higher correlations than PCA!
 cor(intermediate_output)
 
+
+# compare the performances ------------------------------------------------
+# how many dimensions to check
+setdim=3
 # pCA reconstruction
 pca.recon <- function(pca, x, k){
   mu <- matrix(rep(pca$center, nrow(pca$x)), nrow = nrow(pca$x), byrow = T)
@@ -132,15 +156,15 @@ for(k in 1:setdim){
   xhat[k] <- pca.recon(pca, x_train, k)$mse
 }
 
-ae.mse <- rep(NA, 5)
+ae.mse <- rep(NA, setdim)
 for(k in 1:setdim){
   modelk <- keras_model_sequential()
   
   modelk %>%
-    layer_dense(units = 20, activation = "tanh", input_shape = ncol(x_train)) %>%
-    layer_dense(units = k, activation = "tanh", name = "bottleneck") %>%
-    layer_dense(units = 20, activation = "tanh") %>%
-    layer_dense(units = ncol(x_train))
+    layer_dense(units = 20, activation = "tanh", input_shape = ncol(x_train), kernel_initializer=initializer_random_uniform(minval = -0.05, maxval = 0.05, seed = 123)) %>%
+    layer_dense(units = k, activation = "tanh", name = "bottleneck", kernel_initializer=initializer_random_uniform(minval = -0.05, maxval = 0.05, seed = 123)) %>%
+    layer_dense(units = 20, activation = "tanh", kernel_initializer=initializer_random_uniform(minval = -0.05, maxval = 0.05, seed = 123)) %>%
+    layer_dense(units = ncol(x_train), kernel_initializer=initializer_random_uniform(minval = -0.05, maxval = 0.05, seed = 123))
   
   modelk %>% compile(
     loss = "mean_squared_error", 

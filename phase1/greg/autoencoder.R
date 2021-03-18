@@ -1,8 +1,30 @@
-library(keras)
+# load libraries ----------------------------------------------------------
 library(tidyverse)
 library(readr)
 library(factoextra)
+set.seed(123)
+library(keras)
+library(tensorflow)
 
+# set seeds ---------------------------------------------------------------
+use_session_with_seed(123)
+
+# TensorFlow session configuration that uses only a single thread. Multiple threads are a 
+# potential source of non-reproducible results, see: https://stackoverflow.com/questions/42022950/which-seeds-have-to-be-set-where-to-realize-100-reproducibility-of-training-res
+session_conf <- tf$ConfigProto(intra_op_parallelism_threads = 1L, 
+                               inter_op_parallelism_threads = 1L)
+
+# Set TF random seed
+tf$set_random_seed(123)
+
+# Create the session using the custom configuration
+sess <- tf$Session(graph = tf$get_default_graph(), config = session_conf)
+
+# Instruct Keras to use this session
+K <- backend()
+K$set_session(sess)
+
+# load the data -----------------------------------------------------------
 data <- read_csv("data/breast_cancer_dataset_dse.csv")
 
 features <- c('NUT12','NUT2','NUT3','NUT5','NUT6','NUT22','NUT23','NUT37','NUT27','NUT9',
@@ -31,15 +53,15 @@ x_train <- as.matrix(x_train)
 epochs = 50
 verbose = 1
 # how many dimensions to check later
-setdim=5
+setdim=3
 
 # set model
 model <- keras_model_sequential()
 model %>%
-  layer_dense(units = 20, activation = "tanh", input_shape = ncol(x_train)) %>%
-  layer_dense(units = 4, activation = "tanh", name = "bottleneck") %>%
-  layer_dense(units = 20, activation = "tanh") %>%
-  layer_dense(units = ncol(x_train))
+  layer_dense(units = 20, activation = "tanh", input_shape = ncol(x_train),kernel_initializer=initializer_random_uniform(minval = -0.05, maxval = 0.05, seed = 123)) %>%
+  layer_dense(units = 4, activation = "tanh", name = "bottleneck",kernel_initializer=initializer_random_uniform(minval = -0.05, maxval = 0.05, seed = 123)) %>%
+  layer_dense(units = 20, activation = "tanh",kernel_initializer=initializer_random_uniform(minval = -0.05, maxval = 0.05, seed = 123)) %>%
+  layer_dense(units = ncol(x_train),kernel_initializer=initializer_random_uniform(minval = -0.05, maxval = 0.05, seed = 123))
 
 # view model layers
 summary(model)
@@ -67,7 +89,7 @@ intermediate_layer_model <- keras_model(inputs = model$input, outputs = get_laye
 intermediate_output <- predict(intermediate_layer_model, x_train)
 
 # print dietary patterns extracted with autoencoder to csv
-#write_csv(data.frame(intermediate_output),'outputs/autoencoder.csv')
+write_csv(data.frame(intermediate_output),'outputs/autoencoder.csv')
 
 ggplot(data.frame(PC1 = intermediate_output[,1], PC2 = intermediate_output[,2]), aes(x = PC1, y = PC2, col = factor(data$V2))) + geom_point()
 
@@ -110,25 +132,6 @@ corcheck %>%
   ) +
   ggtitle('Correlations with the latent variables')
 
-# canonical correlation analysis to see which factors are the most similar to the paper
-# first dataset
-compare <- read.csv("phase1/greg/pcfa_loadings.csv")
-rownames(compare) <- compare$nutrient
-compare = compare[,-1]
-X <- as.matrix(compare)
-# second dataset
-Y <- as.matrix(corcheck)
-# canonical correlation
-library(CCA)
-res.cc <- cc(X,Y)
-plt.cc(res.cc, var.label = TRUE)
-
-# guess
-# dim1: vegetable fat
-# dim2: unsaturated fats starch rich
-# dim3: animal proteins
-# dim4: vitamins and fiber
-
 # cor between PC1 and PC2
 cor(pca$x[,1:4])
 # cor between dimension 1 and 2, higher correlations than PCA!
@@ -147,15 +150,15 @@ for(k in 1:setdim){
   xhat[k] <- pca.recon(pca, x_train, k)$mse
 }
 
-ae.mse <- rep(NA, 5)
+ae.mse <- rep(NA, setdim)
 for(k in 1:setdim){
   modelk <- keras_model_sequential()
   
   modelk %>%
-    layer_dense(units = 20, activation = "tanh", input_shape = ncol(x_train)) %>%
-    layer_dense(units = k, activation = "tanh", name = "bottleneck") %>%
-    layer_dense(units = 20, activation = "tanh") %>%
-    layer_dense(units = ncol(x_train))
+    layer_dense(units = 20, activation = "tanh", input_shape = ncol(x_train),kernel_initializer=initializer_random_uniform(minval = -0.05, maxval = 0.05, seed = 123)) %>%
+    layer_dense(units = k, activation = "tanh", name = "bottleneck",kernel_initializer=initializer_random_uniform(minval = -0.05, maxval = 0.05, seed = 123)) %>%
+    layer_dense(units = 20, activation = "tanh", kernel_initializer=initializer_random_uniform(minval = -0.05, maxval = 0.05, seed = 123)) %>%
+    layer_dense(units = ncol(x_train), kernel_initializer=initializer_random_uniform(minval = -0.05, maxval = 0.05, seed = 123))
   
   modelk %>% compile(
     loss = "mean_squared_error", 
