@@ -5,7 +5,7 @@ library(factoextra)
 
 data <- read_csv("data/breast_cancer_dataset_dse.csv")
 
-features <- c('NUT12','NUT2','NUT3','NUT5','NUT6','NUT22','NUT23','NUT37','NUT27','NUT9',
+features <- c('NUT2','NUT3','NUT22','NUT23','NUT37','NUT27','NUT9',
               'NUT11','NUT13','NUT16','NUT15','NUT17','NUT31','NUT14','NUT32','NUT18',
               'NUT19','NUT21','NUT33','NUT34','NUT35','NUT28','NUT29','NUT46','NUT36',
               'NUT30','NUT62')
@@ -67,22 +67,26 @@ intermediate_layer_model <- keras_model(inputs = model$input, outputs = get_laye
 intermediate_output <- predict(intermediate_layer_model, x_train)
 
 # print dietary patterns extracted with autoencoder to csv
-#write_csv(data.frame(intermediate_output),'outputs/autoencoder.csv')
+write_csv(data.frame(intermediate_output),'outputs/autoencoder_new.csv')
 
 ggplot(data.frame(PC1 = intermediate_output[,1], PC2 = intermediate_output[,2]), aes(x = PC1, y = PC2, col = factor(data$V2))) + geom_point()
+ggplot(data.frame(PC1 = intermediate_output[,1], PC2 = intermediate_output[,3]), aes(x = PC1, y = PC2, col = factor(data$V2))) + geom_point()
+ggplot(data.frame(PC1 = intermediate_output[,1], PC2 = intermediate_output[,4]), aes(x = PC1, y = PC2, col = factor(data$V2))) + geom_point()
+ggplot(data.frame(PC1 = intermediate_output[,2], PC2 = intermediate_output[,3]), aes(x = PC1, y = PC2, col = factor(data$V2))) + geom_point()
+ggplot(data.frame(PC1 = intermediate_output[,2], PC2 = intermediate_output[,4]), aes(x = PC1, y = PC2, col = factor(data$V2))) + geom_point()
+ggplot(data.frame(PC1 = intermediate_output[,3], PC2 = intermediate_output[,4]), aes(x = PC1, y = PC2, col = factor(data$V2))) + geom_point()
 
 # interpret the dimensions
-new_labels = c('energy intake','animal protein', 'vegetable protein', 'animal fat', 'vegetable fat',
-               'cholesterol', 'saturated fatty acids', 'monosaturated fatty acids', 'polyunsaturated fatty acids',
-               'soluble carbohydrates', 'starch', 'alcohol', 'sodium', 'calcium', 'potassium', 'phosphorus',
-               'iron', 'zinc', 'vitamin B1', 'vitamin B2', 'vitamin C', 'vitamin B6', 'total folate',
+new_labels = c('animal protein', 'vegetable protein', 'cholesterol', 'saturated fatty acids', 'monosaturated fatty acids',
+               'polyunsaturated fatty acids', 'soluble carbohydrates', 'starch', 'alcohol', 'sodium', 'calcium', 'potassium',
+               'phosphorus','iron', 'zinc', 'vitamin B1', 'vitamin B2', 'vitamin C', 'vitamin B6', 'total folate',
                'niacin', 'retinol', 'beta-carotene equivalents', 'lycopene', 'vitamin D', 'vitamin E', 'total fiber')
 
-corcheck = data.frame(matrix(nrow = 30, ncol = 4))
+corcheck = data.frame(matrix(nrow = 27, ncol = 4))
 colnames(corcheck) = c('DIM1','DIM2','DIM3','DIM4')
 rownames(corcheck) = new_labels
 
-for(i in 1:30){
+for(i in 1:27){
   for(d in 1:4){
     corcheck[i,d] = cor(x_train[,i],intermediate_output[,d])
   }
@@ -109,25 +113,6 @@ corcheck %>%
     axis.title.y=element_blank()
   ) +
   ggtitle('Correlations with the latent variables')
-
-# canonical correlation analysis to see which factors are the most similar to the paper
-# first dataset
-compare <- read.csv("phase1/greg/pcfa_loadings.csv")
-rownames(compare) <- compare$nutrient
-compare = compare[,-1]
-X <- as.matrix(compare)
-# second dataset
-Y <- as.matrix(corcheck)
-# canonical correlation
-library(CCA)
-res.cc <- cc(X,Y)
-plt.cc(res.cc, var.label = TRUE)
-
-# guess
-# dim1: vegetable fat
-# dim2: unsaturated fats starch rich
-# dim3: animal proteins
-# dim4: vitamins and fiber
 
 # cor between PC1 and PC2
 cor(pca$x[,1:4])
