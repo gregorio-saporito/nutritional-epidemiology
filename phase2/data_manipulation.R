@@ -1,5 +1,6 @@
 ### Data Manipulation
 library(ForImp)
+library(dplyr)
 
 # Importing data
 path <- '../data/breast_cancer_dataset_dse.csv'
@@ -52,6 +53,55 @@ med_var = c('ANAM1', 'ANAM2', 'ANAM3', 'ANAM4', 'ANAM5', 'ANAM6', 'ANAM7', 'ANAM
             'ANAM24', 'ANAM25', 'ANAM26', 'ANAM27')
 df[med_var][df[med_var] > 0] <- 1
 
-# Convert continuous variables to categorical
-to_cat <- c('V8', 'V11', 'V12', 'FUM7', 'ANTR1', 'ANTR2', 'ALC0', 'GIN1', 'GIN7', 'GIN8', 'GIN9')
+# Compute BMI
+df['BMI'] <- df['ANTR1']/(data['ANTR2']/100)^2
+df <- df %>% mutate(ANTR0 = case_when(BMI < 18.5 ~ 'underweight',
+                                                 BMI >= 18.5 & BMI < 25 ~ 'normal weight',
+                                                 BMI >= 25 & BMI < 30 ~ 'overweight',
+                                                 BMI >= 30 ~ 'obesity'))
 
+# Convert continuous variables to categorical
+to_cat <- c('V8', 'V11', 'V12', 'FUM7', 'ALC0', 'GIN1', 'GIN8', 'GIN9')
+
+df <- df %>% mutate(AGE = case_when(V8 < 40 ~ '<40',
+                                    V8 >= 40 & V8 < 60 ~ '>=40 & <60',
+                                    V8 >= 60 ~ '>= 60'))
+
+df <- df %>% mutate(CHILD = case_when(V11 == 0 ~ '0',
+                                      V11 == 1 ~ '1',
+                                      V11 >= 2 ~ '2+'))
+
+df <- df %>% mutate(EDU = case_when(V12 <= 5 ~ 'elementary',
+                                    V12 > 5 & V12 <= 15 ~ 'middle/high',
+                                    V12 > 15 ~ 'university'))
+
+df <- df %>% mutate(SMOKE = case_when(FUM7 == 0 ~ 'non smoker',
+                                      FUM7 > 0 & FUM7 <= 25 ~ 'smoker for <=25y',
+                                      FUM7 > 25 ~ 'smoker for >25y'))
+
+df <- df %>% mutate(ALCOHOL = case_when(ALC0 == 0 ~ '0 unit/week',
+                                        ALC0 > 0 & ALC0 <= 5 ~ '1-5 unit/week',
+                                        ALC0 > 5 & ALC0 <= 10 ~ '5-10 unit/week',
+                                        ALC0 > 10 ~ '>10 unit/week'))
+
+df <- df %>% mutate(MENARCHE = case_when(GIN1 < 12 ~ '<12y',
+                                        GIN1 >= 12 & GIN1 <= 15 ~ '12-15y',
+                                        GIN1 > 15 ~ '>15y'))
+
+df <- df %>% mutate(MISCAR = case_when(GIN8 == 0 ~ '0',
+                                      GIN8 > 0 & GIN8 <= 2 ~ '1-2',
+                                      GIN8 > 2 ~ '3+'))
+
+df <- df %>% mutate(INDABORT = case_when(GIN9 == 0 ~ '0',
+                                        GIN9 > 0 ~ '1+'))
+
+# Drop variables due to redundancy
+df$FUM1 <- NULL
+df$ANTR1 <- NULL
+df$ANTR2 <- NULL
+df$BMI <- NULL
+df$GIN7 <- NULL
+df <- df[, !(names(df) %in% to_cat)]
+
+# Export csv
+write.csv(df, '../phase2/data.csv', row.names = FALSE)
