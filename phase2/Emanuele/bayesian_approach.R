@@ -18,6 +18,9 @@ colnames(df_diet)[1] <- "X1"
 #union of the two datasets
 df = cbind(df_cleaned, df_diet)
 
+
+head(df)
+
 #Cancer = 1/ no cancer = 0
 df$V2[df$V2 == 2] = 0
 summary(df)
@@ -26,8 +29,6 @@ df$X1 = scale(normalize(df$X1))
 df$X2 = scale(normalize(df$X2))
 df$X3 = scale(normalize(df$X3))
 df$X4 = scale(normalize(df$X4))
-
-hist(df$X4)
 
 
 #categorize the diets
@@ -43,6 +44,8 @@ names <- c(1:ncol(df))
 df[,names] <- lapply(df[,names] , factor)
 str(df)
 
+#Mosaic plot Age - V2
+mosaicplot(table(df$AGE, df$V2))
 
 #Diet_tot
 
@@ -280,4 +283,15 @@ title(xlab="Quartiles of diet X4")
 title(ylab="Probability of cancer")
 legend(1, g_range[2], c("<=40",">40 & < 60", ">=60", "all"), cex=0.8, 
        col=c("purple","red", "green", "black"), pch = 21, lty = 1, title = "Age of the patient:")
+
+
+
+
+
+
+
+
+
+
+
 
