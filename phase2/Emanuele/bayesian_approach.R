@@ -93,6 +93,7 @@ adj[which(mat_sum >= 2)] = 1
 adj
 
 model = empty.graph(colnames(mat_sum))
+title(main="Bayesian Network ", col.main="red")
 
 adj["X4","X3"] = 0L
 adj["X2", "X4"] = 0L
@@ -105,11 +106,12 @@ adj["X3", "X2"] = 0L
 amat(model) = adj
 model = pdag2dag(model, ordering =colnames(mat_sum))
 
-plot(model)
+graphviz.plot(model)
 
 fit = bn.fit(model, diet.df)
 
-#Calculate the probability of cancer by varying the confounding varriables for each diet:
+
+#Calculate the probability of cancer by varying the confounding variables for each diet:
 
 age_values = unique(df$AGE)
 
